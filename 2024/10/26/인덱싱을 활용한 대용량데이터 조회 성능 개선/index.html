@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="처음으로 index를 활용해서 조회 성능을 개선해본 경험을 글로써 정리해보려합니다. 예상 되는 문제‘시니또’ 라는 프로젝트에서 우리 팀은 ‘PENDING COMPETE(완료 대기)’인 상태로 2일이 지나면 자동으로 ‘COMPLETE(완료)’ 상태로 변화되는 정책을 결정하였습니다. 그렇기 때문에 이 조회는 10분마다 작동하도록 설정을 해놓은 상태였습니다.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="인덱싱을 활용한 대용량데이터 조회 성능 개선">
+<meta property="og:url" content="http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/index.html">
+<meta property="og:site_name" content="Seonghun&#39;s BLOG">
+<meta property="og:description" content="처음으로 index를 활용해서 조회 성능을 개선해본 경험을 글로써 정리해보려합니다. 예상 되는 문제‘시니또’ 라는 프로젝트에서 우리 팀은 ‘PENDING COMPETE(완료 대기)’인 상태로 2일이 지나면 자동으로 ‘COMPLETE(완료)’ 상태로 변화되는 정책을 결정하였습니다. 그렇기 때문에 이 조회는 10분마다 작동하도록 설정을 해놓은 상태였습니다.">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2024-10-25T15:00:00.000Z">
+<meta property="article:modified_time" content="2024-12-20T06:40:25.991Z">
+<meta property="article:author" content="정성훈">
+<meta property="article:tag" content="DB">
+<meta name="twitter:card" content="summary">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>인덱싱을 활용한 대용량데이터 조회 성능 개선</title>
+    <!-- async scripts -->
+    <!-- Google Analytics -->
+
+
+    <!-- Umami Analytics -->
+
+
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fa-solid fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fa-solid fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" aria-label="Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fa-solid fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     -->
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        
+        <li><a class="icon" aria-label="Next post" href="/2024/09/29/%E1%84%80%E1%85%B5%E1%86%BA%E1%84%92%E1%85%A5%E1%84%87%E1%85%B3%20%E1%84%8E%E1%85%AE%E1%86%BC%E1%84%83%E1%85%A9%E1%86%AF%20%E1%84%87%E1%85%A1%E1%86%AF%E1%84%89%E1%85%A2%E1%86%BC%20%E1%84%87%E1%85%AE%E1%86%AB%E1%84%89%E1%85%A5%E1%86%A8%E1%84%80%E1%85%AA%20%E1%84%92%E1%85%A2%E1%84%80%E1%85%A7%E1%86%AF/"><i class="fa-solid fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" aria-label="Back to top" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fa-solid fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post" href="#"><i class="fa-solid fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&text=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&is_video=false&description=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=인덱싱을 활용한 대용량데이터 조회 성능 개선&body=Check out this article: http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/"><i class="fa-solid fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&name=인덱싱을 활용한 대용량데이터 조회 성능 개선&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&t=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    
+    
+      <div id="toc">
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%98%88%EC%83%81-%EB%90%98%EB%8A%94-%EB%AC%B8%EC%A0%9C"><span class="toc-number">1.</span> <span class="toc-text">예상 되는 문제</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0%EC%9D%98-%EC%8B%A4%EB%A7%88%EB%A6%AC"><span class="toc-number">2.</span> <span class="toc-text">문제 해결의 실마리</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%8B%A4%ED%97%98-%EC%A4%80%EB%B9%84"><span class="toc-number">3.</span> <span class="toc-text">실험 준비</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%ED%85%8C%EC%9D%B4%EB%B8%94"><span class="toc-number">3.1.</span> <span class="toc-text">테이블</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%8B%A4%ED%96%89%EB%90%98%EB%8A%94-%EC%A1%B0%ED%9A%8C-%EC%BF%BC%EB%A6%AC"><span class="toc-number">3.2.</span> <span class="toc-text">실행되는 조회 쿼리</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EB%8D%94%EB%AF%B8%EB%8D%B0%EC%9D%B4%ED%84%B0-%EC%82%BD%EC%9E%85-%EC%BF%BC%EB%A6%AC"><span class="toc-number">3.3.</span> <span class="toc-text">더미데이터 삽입 쿼리</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%8B%A4%ED%97%98-%EC%9D%B8%EB%8D%B1%EC%8A%A4%EB%A5%BC-%EC%96%B4%EB%8A%90-%EC%86%8D%EC%84%B1%EC%97%90-%EC%A0%81%EC%9A%A9%ED%95%B4%EC%95%BC-%EC%B5%9C%EC%A0%81%EC%9D%98-%EC%84%B1%EB%8A%A5%EA%B0%9C%EC%84%A0%EC%9D%B4-%EB%90%98%EB%8A%94%EA%B0%80"><span class="toc-number">4.</span> <span class="toc-text">실험 : 인덱스를 어느 속성에 적용해야 최적의 성능개선이 되는가?</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%9D%B8%EB%8D%B1%EC%8A%A4-%EB%AF%B8%EC%A0%81%EC%9A%A9%EC%8B%9C-%ED%8F%89%EA%B7%A0-%EC%8B%9C%EA%B0%84%EA%B3%BC-EXPLAIN-%EA%B2%B0%EA%B3%BC"><span class="toc-number">4.1.</span> <span class="toc-text">인덱스 미적용시 평균 시간과 EXPLAIN 결과</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%9D%B8%EB%8D%B1%EC%8B%B1-%EC%A0%81%EC%9A%A9-1-PENDING-COMPLETE-TIME%EB%A7%8C-%EC%9D%B8%EB%8D%B1%EC%8B%B1"><span class="toc-number">4.2.</span> <span class="toc-text">인덱싱 적용 1: PENDING COMPLETE TIME만 인덱싱</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%9D%B8%EB%8D%B1%EC%8B%B1-%EC%A0%81%EC%9A%A9-2-PENDING-COMPLETE-TIME-STATUS%EB%A5%BC-%EB%B3%B5%ED%95%A9-%EC%9D%B8%EB%8D%B1%EC%8B%B1"><span class="toc-number">4.3.</span> <span class="toc-text">인덱싱 적용 2: PENDING COMPLETE TIME, STATUS를 복합 인덱싱</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%9D%B8%EB%8D%B1%EC%8B%B1-%EC%A0%81%EC%9A%A9-3-STATUS%EB%A7%8C-%EC%9D%B8%EB%8D%B1%EC%8B%B1"><span class="toc-number">4.4.</span> <span class="toc-text">인덱싱 적용 3: STATUS만 인덱싱</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%A0%95%EB%A6%AC"><span class="toc-number">5.</span> <span class="toc-text">정리</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%ED%9B%84%EA%B8%B0"><span class="toc-number">6.</span> <span class="toc-text">후기</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EA%B6%81%EA%B8%88%ED%95%9C-%EB%B6%80%EB%B6%84"><span class="toc-number">7.</span> <span class="toc-text">궁금한 부분</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%B0%B8%EA%B3%A0%ED%95%9C-%EC%9E%90%EB%A3%8C%EB%93%A4"><span class="toc-number">8.</span> <span class="toc-text">참고한 자료들</span></a></li></ol>
+      </div>
+    
+  </span>
+</div>
+
+    
+    <div class="content index py4 ">
+        
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle p-name" itemprop="name headline">
+        인덱싱을 활용한 대용량데이터 조회 성능 개선
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author p-author h-card" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span class="p-name" itemprop="name">정성훈</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2024-10-25T15:00:00.000Z" class="dt-published" itemprop="datePublished">2024-10-26</time>
+        
+      
+    </div>
+
+
+      
+
+      
+    <div class="article-tag">
+        <i class="fa-solid fa-tag"></i>
+        <a class="p-category" href="/tags/DB/" rel="tag">DB</a>
+    </div>
+
+
+    </div>
+  </header>
+  
+
+  <div class="content e-content" itemprop="articleBody">
+    <p>처음으로 index를 활용해서 조회 성능을 개선해본 경험을 글로써 정리해보려합니다.</p>
+<h2 id="예상-되는-문제"><a href="#예상-되는-문제" class="headerlink" title="예상 되는 문제"></a>예상 되는 문제</h2><p>‘시니또’ 라는 프로젝트에서 우리 팀은 ‘PENDING COMPETE(완료 대기)’인 상태로 2일이 지나면 자동으로 ‘COMPLETE(완료)’ 상태로 변화되는 정책을 결정하였습니다. 그렇기 때문에 이 조회는 10분마다 작동하도록 설정을 해놓은 상태였습니다. </p>
+<p>하지만, 하나의 테이블에 <code>CALLBACK</code> 데이터가 누적이 되기 때문에 <strong>시간이 지날 수록 데이터가 누적</strong>되면 조회 &#x3D;&#x3D;성능이 어떻게 저하&#x3D;&#x3D;될거 같다는 팀원의 의견이 나왔고 타당한 의견이라는 생각이 들어 이걸 어떻게 해결할 수 있을지 고민되었습니다.</p>
+<h2 id="문제-해결의-실마리"><a href="#문제-해결의-실마리" class="headerlink" title="문제 해결의 실마리"></a>문제 해결의 실마리</h2><p>고민을 해보다가 마침 멘토링할 수 있는 기회가 생겨 멘토님께 이 문제를 어떻게 해결할 수 있을지 질문드려보았는데요. 이런 답을 주셨습니다.</p>
+<ul>
+<li>index 적용</li>
+<li>EXPLAIN 을 활용하여 데이터베이스의 실행 계획 분석</li>
+</ul>
+<p>저는 index는 여러 책과 유튜브등에서 접해보았지만 실제로 사용해본적은 없었고, EXPLAIN이라는 쿼리는 사실 고급 개발자만 하는게 아닌가하는 두려움이 있었습니다. </p>
+<p>하지만 멘토님께서 우리 학생들이 못할 만 한걸 추천해주었을 리가 없다는 생각과 별거아니겠지하는 생각으로 공부를 진행하였고 생각보다 할 만하다고 생각이 되었습니다. </p>
+<p>간단히 학습을 마친후, 저는 아래와 같은 사항을 실험해보고 싶은 생각이 들었고 실천하였습니다.</p>
+<ul>
+<li>인덱스를 어느 속성에 적용해야 최적의 성능개선이 되는가?</li>
+</ul>
+<h2 id="실험-준비"><a href="#실험-준비" class="headerlink" title="실험 준비"></a>실험 준비</h2><h3 id="테이블"><a href="#테이블" class="headerlink" title="테이블"></a>테이블</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE TABLE</span> callback (</span><br><span class="line">    assigned_member_id <span class="type">BIGINT</span>,</span><br><span class="line">    id <span class="type">INT</span> AUTO_INCREMENT,</span><br><span class="line">    pending_complete_time <span class="type">TIMESTAMP</span>(<span class="number">6</span>),</span><br><span class="line">    post_time <span class="type">TIMESTAMP</span>(<span class="number">6</span>),</span><br><span class="line">    senior_id <span class="type">BIGINT</span> <span class="keyword">NOT NULL</span>,</span><br><span class="line">    status ENUM(<span class="string">&#x27;COMPLETE&#x27;</span>, <span class="string">&#x27;IN_PROGRESS&#x27;</span>, <span class="string">&#x27;PENDING_COMPLETE&#x27;</span>, <span class="string">&#x27;WAITING&#x27;</span>) <span class="keyword">NOT NULL</span>,</span><br><span class="line">    <span class="keyword">PRIMARY KEY</span> (id)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<h3 id="실행되는-조회-쿼리"><a href="#실행되는-조회-쿼리" class="headerlink" title="실행되는 조회 쿼리"></a>실행되는 조회 쿼리</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> SQL_NO_CACHE</span><br><span class="line">    callback.id,</span><br><span class="line">    callback.assigned_member_id,</span><br><span class="line">    callback.pending_complete_time,</span><br><span class="line">    callback.post_time,</span><br><span class="line">    callback.senior_id,</span><br><span class="line">    callback.status </span><br><span class="line"><span class="keyword">FROM</span></span><br><span class="line">    callback</span><br><span class="line"><span class="keyword">WHERE</span></span><br><span class="line">   callback.pending_complete_time <span class="keyword">BETWEEN</span> <span class="string">&#x27;2023-03-24 18:31:00&#x27;</span> <span class="keyword">AND</span> <span class="string">&#x27;2023-03-24 18:41:00&#x27;</span></span><br><span class="line">   <span class="keyword">AND</span> callback.status <span class="operator">=</span> <span class="string">&#x27;PENDING_COMPLETE&#x27;</span>;</span><br></pre></td></tr></table></figure>
+<h3 id="더미데이터-삽입-쿼리"><a href="#더미데이터-삽입-쿼리" class="headerlink" title="더미데이터 삽입 쿼리"></a>더미데이터 삽입 쿼리</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">BEGIN</span></span><br><span class="line">    <span class="keyword">DECLARE</span> v_counter <span class="type">INT</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    WHILE v_counter <span class="operator">&lt;</span> <span class="number">300000</span> DO</span><br><span class="line">        <span class="keyword">INSERT INTO</span> callback (assigned_member_id, pending_complete_time, post_time, senior_id, status)</span><br><span class="line">        <span class="keyword">VALUES</span> (</span><br><span class="line">            <span class="built_in">FLOOR</span>(RAND() <span class="operator">*</span> <span class="number">10000</span>),</span><br><span class="line">            NOW() <span class="operator">-</span> <span class="type">INTERVAL</span> <span class="built_in">FLOOR</span>(RAND() <span class="operator">*</span> (<span class="number">3</span> <span class="operator">*</span> <span class="number">365</span> <span class="operator">*</span> <span class="number">24</span>)) <span class="keyword">HOUR</span>,  <span class="comment">-- 3년 전까지 랜덤 pending_complete_time</span></span><br><span class="line">            NOW() <span class="operator">-</span> <span class="type">INTERVAL</span> <span class="built_in">FLOOR</span>(RAND() <span class="operator">*</span> (<span class="number">3</span> <span class="operator">*</span> <span class="number">365</span> <span class="operator">*</span> <span class="number">24</span>)) <span class="keyword">HOUR</span>,  <span class="comment">-- 3년 전까지 랜덤 post_time</span></span><br><span class="line">            <span class="built_in">FLOOR</span>(RAND() <span class="operator">*</span> <span class="number">10000</span>),  <span class="comment">-- 랜덤 senior_id</span></span><br><span class="line">            ELT(<span class="built_in">FLOOR</span>(RAND() <span class="operator">*</span> <span class="number">4</span>) <span class="operator">+</span> <span class="number">1</span>, <span class="string">&#x27;COMPLETE&#x27;</span>, <span class="string">&#x27;IN_PROGRESS&#x27;</span>, <span class="string">&#x27;PENDING_COMPLETE&#x27;</span>, <span class="string">&#x27;WAITING&#x27;</span>)  <span class="comment">-- 랜덤 status</span></span><br><span class="line">        );</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">SET</span> v_counter <span class="operator">=</span> v_counter <span class="operator">+</span> <span class="number">1</span>;  <span class="comment">-- 카운터 증가</span></span><br><span class="line">    <span class="keyword">END</span> WHILE;</span><br><span class="line"><span class="keyword">END</span></span><br></pre></td></tr></table></figure>
+<h2 id="실험-인덱스를-어느-속성에-적용해야-최적의-성능개선이-되는가"><a href="#실험-인덱스를-어느-속성에-적용해야-최적의-성능개선이-되는가" class="headerlink" title="실험 : 인덱스를 어느 속성에 적용해야 최적의 성능개선이 되는가?"></a>실험 : 인덱스를 어느 속성에 적용해야 최적의 성능개선이 되는가?</h2><ul>
+<li>기간: 이전 3년 </li>
+<li>데이터양: 300,000 건</li>
+</ul>
+<h3 id="인덱스-미적용시-평균-시간과-EXPLAIN-결과"><a href="#인덱스-미적용시-평균-시간과-EXPLAIN-결과" class="headerlink" title="인덱스 미적용시 평균 시간과 EXPLAIN 결과"></a>인덱스 미적용시 평균 시간과 EXPLAIN 결과</h3><ul>
+<li>평균 시간<ul>
+<li>0.142 sec</li>
+</ul>
+</li>
+<li>EXPLAIN 결과<br>![[SCR-20241104-rhju.png]]</li>
+</ul>
+<h3 id="인덱싱-적용-1-PENDING-COMPLETE-TIME만-인덱싱"><a href="#인덱싱-적용-1-PENDING-COMPLETE-TIME만-인덱싱" class="headerlink" title="인덱싱 적용 1: PENDING COMPLETE TIME만 인덱싱"></a>인덱싱 적용 1: <code>PENDING COMPLETE TIME</code>만 인덱싱</h3><ul>
+<li>평균 시간<ul>
+<li>0.00086 sec</li>
+</ul>
+</li>
+<li>EXPLAIN 결과<br>![[SCR-20241104-rikp.png]]</li>
+</ul>
+<h3 id="인덱싱-적용-2-PENDING-COMPLETE-TIME-STATUS를-복합-인덱싱"><a href="#인덱싱-적용-2-PENDING-COMPLETE-TIME-STATUS를-복합-인덱싱" class="headerlink" title="인덱싱 적용 2: PENDING COMPLETE TIME, STATUS를 복합 인덱싱"></a>인덱싱 적용 2: <code>PENDING COMPLETE TIME</code>, <code>STATUS</code>를 복합 인덱싱</h3><ul>
+<li>평균 시간<ul>
+<li>0.00073 sec</li>
+</ul>
+</li>
+<li>EXPLAIN 결과<br>![[SCR-20241104-rktg.png]]</li>
+</ul>
+<h3 id="인덱싱-적용-3-STATUS만-인덱싱"><a href="#인덱싱-적용-3-STATUS만-인덱싱" class="headerlink" title="인덱싱 적용 3: STATUS만 인덱싱"></a>인덱싱 적용 3: <code>STATUS</code>만 인덱싱</h3><ul>
+<li>평균 시간<ul>
+<li>0.139 sec</li>
+</ul>
+</li>
+<li>EXPLAIN<br>![[SCR-20241104-rlfb.png]]</li>
+</ul>
+<h2 id="정리"><a href="#정리" class="headerlink" title="정리"></a>정리</h2><p>인덱스를 적용한 3개의 경우중에서 2번째(<code>PENDING COMPLETE TIME</code>, <code>STATUS</code> 인덱싱)가 쿼리 실행시 검사 할 <code>rows</code>가 8으로 작고, <code>Using index condition</code>만 존재하여 절차가 다른 쿼리에 비해 짧은거 같아 가장 성능이 좋을것으로 예상되었는데 막상 평균내보니 1번째( <code>PENDING COMPLETE TIME</code> 인덱싱)와 비슷하거나 오히려 약간 느린 상황이 확인되었습니다.</p>
+<p><code>status</code> 컬럼이 <code>enum</code>이고 값을 4가지만 가져서 &#x3D;&#x3D;카디널리티가 낮아 인덱싱 효율이 낮아서&#x3D;&#x3D; 이런 결과가 나온것으로 예상이 됩니다. </p>
+<p>이런 경우 속도차이는 크게없고, 2번째(<code>PENDING COMPLETE TIME</code>, <code>STATUS</code> 인덱싱)가 복합인덱싱을 하는데 리소스를 더 쓰니 1번째( <code>PENDING COMPLETE TIME</code> 인덱싱)로 인덱싱 전략을 선택하는게 타당하다는 결론이 도출됩니다.</p>
+<h2 id="후기"><a href="#후기" class="headerlink" title="후기"></a>후기</h2><p>나름 공부해서 실천해본 실험인데 겉핧기식으로 했다는 느낌을 지울수 없다. 이 부분 꾸준히 개발 서적과 개발 유튜브, 테크 블로그들 찾아보며 갈고닦아보자. 일단 재미가 있다. 👍😎</p>
+<h2 id="궁금한-부분"><a href="#궁금한-부분" class="headerlink" title="궁금한 부분"></a>궁금한 부분</h2><ul>
+<li>인덱스를 적용하면 조회 측면에서 큰 이득을 보지만, update 에서 손해를 본다. 이런 트레이드 오프에 대한 기준이 있을까?</li>
+</ul>
+<h2 id="참고한-자료들"><a href="#참고한-자료들" class="headerlink" title="참고한 자료들"></a>참고한 자료들</h2><p>아래 서적들을 참고하였습니다. 모두 큰 도움을 받아 추천드립니다.</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://m.yes24.com/Goods/Detail/112622445">MySQL 성능 최적화</a></li>
+<li><a target="_blank" rel="noopener" href="https://m.yes24.com/Goods/Detail/24089836">SQL 레벨업</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.yes24.com/Product/Goods/102382080">업무에 바로 쓰는 SQL 튜닝</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.yes24.com/Product/Goods/7957807">데이터베이스르 지탱하는 기술</a></li>
+</ul>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+        
+          <li><a href="/">Home</a></li>
+        
+          <li><a href="/about/">About</a></li>
+        
+          <li><a href="/archives/">Writing</a></li>
+        
+      </ul>
+    </div>
+
+    
+    
+      <div id="toc-footer" style="display: none">
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%98%88%EC%83%81-%EB%90%98%EB%8A%94-%EB%AC%B8%EC%A0%9C"><span class="toc-number">1.</span> <span class="toc-text">예상 되는 문제</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0%EC%9D%98-%EC%8B%A4%EB%A7%88%EB%A6%AC"><span class="toc-number">2.</span> <span class="toc-text">문제 해결의 실마리</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%8B%A4%ED%97%98-%EC%A4%80%EB%B9%84"><span class="toc-number">3.</span> <span class="toc-text">실험 준비</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%ED%85%8C%EC%9D%B4%EB%B8%94"><span class="toc-number">3.1.</span> <span class="toc-text">테이블</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%8B%A4%ED%96%89%EB%90%98%EB%8A%94-%EC%A1%B0%ED%9A%8C-%EC%BF%BC%EB%A6%AC"><span class="toc-number">3.2.</span> <span class="toc-text">실행되는 조회 쿼리</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EB%8D%94%EB%AF%B8%EB%8D%B0%EC%9D%B4%ED%84%B0-%EC%82%BD%EC%9E%85-%EC%BF%BC%EB%A6%AC"><span class="toc-number">3.3.</span> <span class="toc-text">더미데이터 삽입 쿼리</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%8B%A4%ED%97%98-%EC%9D%B8%EB%8D%B1%EC%8A%A4%EB%A5%BC-%EC%96%B4%EB%8A%90-%EC%86%8D%EC%84%B1%EC%97%90-%EC%A0%81%EC%9A%A9%ED%95%B4%EC%95%BC-%EC%B5%9C%EC%A0%81%EC%9D%98-%EC%84%B1%EB%8A%A5%EA%B0%9C%EC%84%A0%EC%9D%B4-%EB%90%98%EB%8A%94%EA%B0%80"><span class="toc-number">4.</span> <span class="toc-text">실험 : 인덱스를 어느 속성에 적용해야 최적의 성능개선이 되는가?</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%9D%B8%EB%8D%B1%EC%8A%A4-%EB%AF%B8%EC%A0%81%EC%9A%A9%EC%8B%9C-%ED%8F%89%EA%B7%A0-%EC%8B%9C%EA%B0%84%EA%B3%BC-EXPLAIN-%EA%B2%B0%EA%B3%BC"><span class="toc-number">4.1.</span> <span class="toc-text">인덱스 미적용시 평균 시간과 EXPLAIN 결과</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%9D%B8%EB%8D%B1%EC%8B%B1-%EC%A0%81%EC%9A%A9-1-PENDING-COMPLETE-TIME%EB%A7%8C-%EC%9D%B8%EB%8D%B1%EC%8B%B1"><span class="toc-number">4.2.</span> <span class="toc-text">인덱싱 적용 1: PENDING COMPLETE TIME만 인덱싱</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%9D%B8%EB%8D%B1%EC%8B%B1-%EC%A0%81%EC%9A%A9-2-PENDING-COMPLETE-TIME-STATUS%EB%A5%BC-%EB%B3%B5%ED%95%A9-%EC%9D%B8%EB%8D%B1%EC%8B%B1"><span class="toc-number">4.3.</span> <span class="toc-text">인덱싱 적용 2: PENDING COMPLETE TIME, STATUS를 복합 인덱싱</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EC%9D%B8%EB%8D%B1%EC%8B%B1-%EC%A0%81%EC%9A%A9-3-STATUS%EB%A7%8C-%EC%9D%B8%EB%8D%B1%EC%8B%B1"><span class="toc-number">4.4.</span> <span class="toc-text">인덱싱 적용 3: STATUS만 인덱싱</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%A0%95%EB%A6%AC"><span class="toc-number">5.</span> <span class="toc-text">정리</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%ED%9B%84%EA%B8%B0"><span class="toc-number">6.</span> <span class="toc-text">후기</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EA%B6%81%EA%B8%88%ED%95%9C-%EB%B6%80%EB%B6%84"><span class="toc-number">7.</span> <span class="toc-text">궁금한 부분</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%B0%B8%EA%B3%A0%ED%95%9C-%EC%9E%90%EB%A3%8C%EB%93%A4"><span class="toc-number">8.</span> <span class="toc-text">참고한 자료들</span></a></li></ol>
+      </div>
+    
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&text=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&is_video=false&description=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=인덱싱을 활용한 대용량데이터 조회 성능 개선&body=Check out this article: http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/"><i class="fa-solid fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&title=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&name=인덱싱을 활용한 대용량데이터 조회 성능 개선&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://example.com/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/&t=인덱싱을 활용한 대용량데이터 조회 성능 개선"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fa-solid fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        
+          <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fa-solid fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fa-solid fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fa-solid fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2024
+    정성훈
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     -->
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script>
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script>
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="fa-regular fa-clone"></i>';
+    btn += '</span>';
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Baidu Analytics -->
+
+<!-- Cloudflare Analytics -->
+
+<!-- Disqus Comments -->
+
+<!-- utterances Comments -->
+
+</body>
+</html>
