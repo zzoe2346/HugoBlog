@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="어라? 왜 &#x3D;&#x3D; 를 사용했는데 Long끼리 제대로 비교가 되지?Long long1 &#x3D; 1L;Long long2 &#x3D; 2L;long2 &#x3D;&#x3D; long2 가 true 가 나오는것을 발견하였다. 만약 이것이 Stirng 이라면 납득이 간다. 왜냐하면 String 은 String Pool이란것을 힙영역에 JVM이 만들어 주지 않는가">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JVM 이 1byte 만큼 정수를 캐싱하는 현상">
+<meta property="og:url" content="https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/index.html">
+<meta property="og:site_name" content="Seonghun&#39;s BLOG">
+<meta property="og:description" content="어라? 왜 &#x3D;&#x3D; 를 사용했는데 Long끼리 제대로 비교가 되지?Long long1 &#x3D; 1L;Long long2 &#x3D; 2L;long2 &#x3D;&#x3D; long2 가 true 가 나오는것을 발견하였다. 만약 이것이 Stirng 이라면 납득이 간다. 왜냐하면 String 은 String Pool이란것을 힙영역에 JVM이 만들어 주지 않는가">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2024-11-11T15:00:00.000Z">
+<meta property="article:modified_time" content="2024-12-20T11:05:23.347Z">
+<meta property="article:author" content="정성훈">
+<meta property="article:tag" content="JVM">
+<meta name="twitter:card" content="summary">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>JVM 이 1byte 만큼 정수를 캐싱하는 현상</title>
+    <!-- async scripts -->
+    <!-- Google Analytics -->
+
+
+    <!-- Umami Analytics -->
+
+
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fa-solid fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fa-solid fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" aria-label="Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fa-solid fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a href="/categories/retrospect/">retrospect</a></li><!--
+     -->
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        
+        <li><a class="icon" aria-label="Next post" href="/2024/10/26/%E1%84%8B%E1%85%B5%E1%86%AB%E1%84%83%E1%85%A6%E1%86%A8%E1%84%89%E1%85%B5%E1%86%BC%E1%84%8B%E1%85%B3%E1%86%AF%20%E1%84%92%E1%85%AA%E1%86%AF%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%92%E1%85%A1%E1%86%AB%20%E1%84%83%E1%85%A2%E1%84%8B%E1%85%AD%E1%86%BC%E1%84%85%E1%85%A3%E1%86%BC%E1%84%83%E1%85%A6%E1%84%8B%E1%85%B5%E1%84%90%E1%85%A5%20%E1%84%8C%E1%85%A9%E1%84%92%E1%85%AC%20%E1%84%89%E1%85%A5%E1%86%BC%E1%84%82%E1%85%B3%E1%86%BC%20%E1%84%80%E1%85%A2%E1%84%89%E1%85%A5%E1%86%AB/"><i class="fa-solid fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" aria-label="Back to top" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fa-solid fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post" href="#"><i class="fa-solid fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&text=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&is_video=false&description=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=JVM 이 1byte 만큼 정수를 캐싱하는 현상&body=Check out this article: https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/"><i class="fa-solid fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&name=JVM 이 1byte 만큼 정수를 캐싱하는 현상&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&t=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    
+    
+      <div id="toc">
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%96%B4%EB%9D%BC-%EC%99%9C-%EB%A5%BC-%EC%82%AC%EC%9A%A9%ED%96%88%EB%8A%94%EB%8D%B0-Long%EB%81%BC%EB%A6%AC-%EC%A0%9C%EB%8C%80%EB%A1%9C-%EB%B9%84%EA%B5%90%EA%B0%80-%EB%90%98%EC%A7%80"><span class="toc-number">1.</span> <span class="toc-text">어라? 왜 &#x3D;&#x3D; 를 사용했는데 Long끼리 제대로 비교가 되지?</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#JVM-%EC%9D%98-127-128-%EC%BA%90%EC%8B%B1"><span class="toc-number">2.</span> <span class="toc-text">JVM 의 -127 ~ 128 캐싱</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%ED%85%8C%EC%8A%A4%ED%8A%B8-%EC%BD%94%EB%93%9C%EB%A5%BC-%ED%86%B5%ED%95%9C-%EA%B2%80%EC%A6%9D"><span class="toc-number">3.</span> <span class="toc-text">테스트 코드를 통한 검증</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%B0%B8%EA%B3%A0%EC%9E%90%EB%A3%8C"><span class="toc-number">4.</span> <span class="toc-text">참고자료</span></a></li></ol>
+      </div>
+    
+  </span>
+</div>
+
+    
+    <div class="content index py4 ">
+        
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle p-name" itemprop="name headline">
+        JVM 이 1byte 만큼 정수를 캐싱하는 현상
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author p-author h-card" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span class="p-name" itemprop="name">정성훈</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2024-11-11T15:00:00.000Z" class="dt-published" itemprop="datePublished">2024-11-12</time>
+        
+      
+    </div>
+
+
+      
+
+      
+    <div class="article-tag">
+        <i class="fa-solid fa-tag"></i>
+        <a class="p-category" href="/tags/JVM/" rel="tag">JVM</a>
+    </div>
+
+
+    </div>
+  </header>
+  
+
+  <div class="content e-content" itemprop="articleBody">
+    <h2 id="어라-왜-를-사용했는데-Long끼리-제대로-비교가-되지"><a href="#어라-왜-를-사용했는데-Long끼리-제대로-비교가-되지" class="headerlink" title="어라? 왜 == 를 사용했는데 Long끼리 제대로 비교가 되지?"></a>어라? 왜 <code>==</code> 를 사용했는데 <code>Long</code>끼리 제대로 비교가 되지?</h2><p>Long long1 &#x3D; 1L;<br>Long long2 &#x3D; 2L;<br>long2 &#x3D;&#x3D; long2 가 true 가 나오는것을 발견하였다. 만약 이것이 <code>Stirng</code> 이라면 납득이 간다. 왜냐하면 <code>String</code> 은 <code>String Pool</code>이란것을 힙영역에 JVM이 만들어 주지 않는가? 하지만 Long 은 그런게 없는것으로 안다. 왜 이런 현상이 벌어지는 걸까?</p>
+<h2 id="JVM-의-127-128-캐싱"><a href="#JVM-의-127-128-캐싱" class="headerlink" title="JVM 의 -127 ~ 128 캐싱"></a>JVM 의 -127 ~ 128 캐싱</h2><p>JVM이 -127 ~ 128 까지의 정수(Integer, Long)은 힙영역에 캐싱하여 같은 수면 같은 참조를 할당해주는다는 사실을 검색을 통해 알게되었다. </p>
+<p>왜 캐싱을 해주는 것일까? 바로 아래에 답이 있다.</p>
+<p>This is based on the assumption that these small values occur much more often than other ints and therefore it makes sense to avoid the overhead of having different objects for every instance (an <code>Integer</code> object takes up something like 12 bytes).</p>
+<p>-127 ~ 128 정수는 자주 사용이 되므로 공통 인스턴스를 활용해서 새로운 인스턴스 생성을 방지하는것이 더욱 이득이라는 생각에 기반한것이다.</p>
+<h2 id="테스트-코드를-통한-검증"><a href="#테스트-코드를-통한-검증" class="headerlink" title="테스트 코드를 통한 검증"></a>테스트 코드를 통한 검증</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">IntegerCachingTest</span> &#123;  </span><br><span class="line">    <span class="comment">/**  </span></span><br><span class="line"><span class="comment">     *  Constant Pool: JVM은 -128에서 127 범위의 정수(Short, Integer, Long 등)를 미리 캐싱하여, 같은 값을 반복해서 생성하지 않고, 해당 범위의 정수는 동일 객체를 재사용  </span></span><br><span class="line"><span class="comment">     *   동일한 숫자 객체를 자주 사용하므로 메모리 사용량을 줄이고, 객체 생성 오버헤드를 줄이는 효과  </span></span><br><span class="line"><span class="comment">     */</span>  </span><br><span class="line">    <span class="meta">@Test</span>  </span><br><span class="line">    <span class="meta">@DisplayName(&quot;JVM 의 Integer 캐싱 테스트&quot;)</span>  </span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">integerCacheTest</span><span class="params">()</span> &#123;  </span><br><span class="line">        <span class="type">Integer</span> <span class="variable">integer1</span> <span class="operator">=</span> <span class="number">127</span>;  </span><br><span class="line">        <span class="type">Integer</span> <span class="variable">integer2</span> <span class="operator">=</span> <span class="number">127</span>;  </span><br><span class="line">  </span><br><span class="line">        assertTrue(integer1 == integer2);  </span><br><span class="line">  </span><br><span class="line">        integer1 = -<span class="number">128</span>;  </span><br><span class="line">        integer2 = -<span class="number">128</span>;  </span><br><span class="line">  </span><br><span class="line">        assertTrue(integer1 == integer2);  </span><br><span class="line">  </span><br><span class="line">         integer1 = <span class="number">128</span>;  </span><br><span class="line">         integer2 = <span class="number">128</span>;  </span><br><span class="line">  </span><br><span class="line">        assertFalse(integer1 == integer2);  </span><br><span class="line">  </span><br><span class="line">        integer1 = -<span class="number">129</span>;  </span><br><span class="line">        integer2 = -<span class="number">129</span>;  </span><br><span class="line">  </span><br><span class="line">        assertFalse(integer1 == integer2);  </span><br><span class="line">    &#125;  </span><br><span class="line">  </span><br><span class="line">    <span class="meta">@Test</span>  </span><br><span class="line">    <span class="meta">@DisplayName(&quot;JVM 의 Long 캐싱 테스트&quot;)</span>  </span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">longCacheTest</span><span class="params">()</span> &#123;  </span><br><span class="line">        <span class="type">Long</span> <span class="variable">long1</span> <span class="operator">=</span> <span class="number">127L</span>;  </span><br><span class="line">        <span class="type">Long</span> <span class="variable">long2</span> <span class="operator">=</span> <span class="number">127L</span>;  </span><br><span class="line">  </span><br><span class="line">        assertTrue(long1 == long2);  </span><br><span class="line">  </span><br><span class="line">        long1 = -<span class="number">128L</span>;  </span><br><span class="line">        long2 = -<span class="number">128L</span>;  </span><br><span class="line">  </span><br><span class="line">        assertTrue(long1 == long2);  </span><br><span class="line">  </span><br><span class="line">        long1 = <span class="number">128L</span>;  </span><br><span class="line">        long2 = <span class="number">128L</span>;  </span><br><span class="line">  </span><br><span class="line">        assertFalse(long1 == long2);  </span><br><span class="line">  </span><br><span class="line">        long1 = -<span class="number">129L</span>;  </span><br><span class="line">        long2 = -<span class="number">129L</span>;  </span><br><span class="line">  </span><br><span class="line">        assertFalse(long1 == long2);  </span><br><span class="line">    &#125;  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="참고자료"><a href="#참고자료" class="headerlink" title="참고자료"></a>참고자료</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.geeksforgeeks.org/java-integer-cache/">https://www.geeksforgeeks.org/java-integer-cache/</a></li>
+<li><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/834961/is-the-cpu-wasted-waiting-for-keyboard-input-generic">https://stackoverflow.com/questions/834961/is-the-cpu-wasted-waiting-for-keyboard-input-generic</a></li>
+<li></li>
+</ul>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+        
+          <li><a href="/">Home</a></li>
+        
+          <li><a href="/about/">About</a></li>
+        
+          <li><a href="/archives/">Writing</a></li>
+        
+          <li><a href="/categories/retrospect/">retrospect</a></li>
+        
+      </ul>
+    </div>
+
+    
+    
+      <div id="toc-footer" style="display: none">
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%96%B4%EB%9D%BC-%EC%99%9C-%EB%A5%BC-%EC%82%AC%EC%9A%A9%ED%96%88%EB%8A%94%EB%8D%B0-Long%EB%81%BC%EB%A6%AC-%EC%A0%9C%EB%8C%80%EB%A1%9C-%EB%B9%84%EA%B5%90%EA%B0%80-%EB%90%98%EC%A7%80"><span class="toc-number">1.</span> <span class="toc-text">어라? 왜 &#x3D;&#x3D; 를 사용했는데 Long끼리 제대로 비교가 되지?</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#JVM-%EC%9D%98-127-128-%EC%BA%90%EC%8B%B1"><span class="toc-number">2.</span> <span class="toc-text">JVM 의 -127 ~ 128 캐싱</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%ED%85%8C%EC%8A%A4%ED%8A%B8-%EC%BD%94%EB%93%9C%EB%A5%BC-%ED%86%B5%ED%95%9C-%EA%B2%80%EC%A6%9D"><span class="toc-number">3.</span> <span class="toc-text">테스트 코드를 통한 검증</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EC%B0%B8%EA%B3%A0%EC%9E%90%EB%A3%8C"><span class="toc-number">4.</span> <span class="toc-text">참고자료</span></a></li></ol>
+      </div>
+    
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&text=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&is_video=false&description=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=JVM 이 1byte 만큼 정수를 캐싱하는 현상&body=Check out this article: https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/"><i class="fa-solid fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&title=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&name=JVM 이 1byte 만큼 정수를 캐싱하는 현상&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=https://jeongseonghun.com/2024/11/12/JVM%20%EC%9D%B4%201byte%20%EB%A7%8C%ED%81%BC%20%EC%A0%95%EC%88%98%EB%A5%BC%20%EC%BA%90%EC%8B%B1%ED%95%98%EB%8A%94%20%ED%98%84%EC%83%81/&t=JVM 이 1byte 만큼 정수를 캐싱하는 현상"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fa-solid fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        
+          <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fa-solid fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fa-solid fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fa-solid fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2024
+    정성훈
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a href="/categories/retrospect/">retrospect</a></li><!--
+     -->
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script>
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script>
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="fa-regular fa-clone"></i>';
+    btn += '</span>';
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Baidu Analytics -->
+
+<!-- Cloudflare Analytics -->
+
+<!-- Disqus Comments -->
+
+<!-- utterances Comments -->
+
+</body>
+</html>
