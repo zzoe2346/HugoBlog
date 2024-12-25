@@ -2,6 +2,7 @@
 title: JVM 이 1byte 만큼 정수를 캐싱하는 현상
 tags:
   - JVM
+  - Git
 date: 2024-11-12
 ---
 
@@ -78,4 +79,3 @@ public class IntegerCachingTest {
 ## 참고자료
 - https://www.geeksforgeeks.org/java-integer-cache/
 - https://stackoverflow.com/questions/834961/is-the-cpu-wasted-waiting-for-keyboard-input-generic
-- 
